@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat App - Login/Register</title>
+  <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 800px;
+      width: 100%;
+    }
+    .auth-screen {
+      padding: 40px;
+      text-align: center;
+    }
+    #chat-screen { 
+      display: none;
+      height: 600px;
+      flex-direction: column;
+    }
+    h1 { 
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+    h2 { 
+      color: #764ba2;
+      margin-bottom: 30px;
+      font-weight: 400;
+      font-size: 16px;
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      justify-content: center;
+    }
+    .tab {
+      padding: 12px 30px;
+      background: #f0f0f0;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: all 0.3s;
+    }
+    .tab.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .form-section {
+      display: none;
+    }
+    .form-section.active {
+      display: block;
+    }
+    input {
+      padding: 12px 20px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      width: 100%;
+      margin-bottom: 15px;
+      transition: border-color 0.3s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    button {
+      padding: 12px 40px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+      width: 100%;
+    }
+    button:hover {
+      transform: translateY(-2px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .error-message {
+      background: #ffebee;
+      color: #c62828;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      display: none;
+    }
+    .success-message {
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      display: none;
+    }
+    #chat-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 16px 16px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid white;
+    }
+    #leave-btn {
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid white;
+      font-size: 14px;
+      width: auto;
+    }
+    #chat-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    #sidebar {
+      width: 200px;
+      background: #f8f9fa;
+      padding: 15px;
+      border-right: 1px solid #e0e0e0;
+      overflow-y: auto;
+    }
+    #sidebar h4 {
+      margin-bottom: 10px;
+      color: #667eea;
+      font-size: 14px;
+    }
+    .user-item {
+      padding: 8px;
+      margin-bottom: 5px;
+      border-radius: 6px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .user-item img {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .status-dot.online { background: #4caf50; }
+    .status-dot.offline { background: #9e9e9e; }
+    #messages-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: white;
+    }
+    .message {
+      margin-bottom: 15px;
+      animation: slideIn 0.3s ease-out;
+      display: flex;
+      gap: 10px;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .message.own {
+      flex-direction: row-reverse;
+    }
+    .message-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .message-content-wrapper {
+      max-width: 70%;
+    }
+    .message.own .message-content-wrapper {
+      text-align: right;
+    }
+    .message-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+    .message.own .message-header {
+      justify-content: flex-end;
+    }
+    .message-username {
+      font-weight: 600;
+      color: #667eea;
+      font-size: 14px;
+    }
+    .message-time {
+      font-size: 12px;
+      color: #999;
+    }
+    .message-content {
+      background: #f0f0f0;
+      padding: 10px 15px;
+      border-radius: 12px;
+      display: inline-block;
+      word-wrap: break-word;
+    }
+    .message.own .message-content {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .message-status {
+      font-size: 11px;
+      color: #999;
+      margin-top: 3px;
+    }
+    .system-message {
+      text-align: center;
+      color: #999;
+      font-size: 13px;
+      font-style: italic;
+      margin: 10px 0;
+    }
+    #typing-indicator {
+      color: #667eea;
+      font-size: 13px;
+      font-style: italic;
+      padding: 0 20px 10px;
+      min-height: 25px;
+    }
+    #message-input-container {
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 0 0 16px 16px;
+      display: flex;
+      gap: 10px;
+    }
+    #message-input {
+      flex: 1;
+      margin-bottom: 0;
+    }
+    #send-btn {
+      width: auto;
+      padding: 12px 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="auth-screen">
+      <h1>💬 Chat Application</h1>
+      <h2>Register or Login to start chatting</h2>
+      
+      <div class="tabs">
+        <button class="tab active" onclick="showTab('login')">Login</button>
+        <button class="tab" onclick="showTab('register')">Register</button>
+      </div>
+
+      <div id="error-msg" class="error-message"></div>
+      <div id="success-msg" class="success-message"></div>
+
+      <!-- Login Form -->
+      <div id="login-form" class="form-section active">
+        <input type="text" id="login-username" placeholder="Username or Email" />
+        <input type="password" id="login-password" placeholder="Password" />
+        <button onclick="login()">Login</button>
+        <p style="margin-top: 15px; color: #666; font-size: 14px;">
+          Test Account: username: <code>test</code>, password: <code>test123</code>
+        </p>
+      </div>
+
+      <!-- Register Form -->
+      <div id="register-form" class="form-section">
+        <input type="text" id="register-username" placeholder="Username" />
+        <input type="email" id="register-email" placeholder="Email" />
+        <input type="password" id="register-password" placeholder="Password" />
+        <input type="text" id="register-displayname" placeholder="Display Name (optional)" />
+        <button onclick="register()">Register</button>
+      </div>
+
+      <!-- Quick Join (Guest) -->
+      <div style="margin-top: 30px; padding-top: 30px; border-top: 2px solid #e0e0e0;">
+        <h3 style="color: #666; font-size: 16px; margin-bottom: 15px;">Or Join as Guest</h3>
+        <input type="text" id="guest-username" placeholder="Guest Username" />
+        <input type="text" id="guest-room" placeholder="Room Name" value="general" />
+        <button onclick="joinAsGuest()">Join as Guest</button>
+      </div>
+    </div>
+
+    <!-- Chat Screen -->
+    <div id="chat-screen">
+      <div id="chat-header">
+        <div class="user-profile">
+          <img id="header-avatar" class="avatar" src="" alt="Avatar" />
+          <div>
+            <div id="header-displayname" style="font-weight: 600;">User</div>
+            <small id="room-name" style="opacity: 0.9;">Room</small>
+          </div>
+        </div>
+        <button id="leave-btn" onclick="leaveChat()">Logout</button>
+      </div>
+      <div id="chat-container">
+        <div id="sidebar">
+          <h4>Online Users</h4>
+          <div id="users-list"></div>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <div id="messages-container"></div>
+          <div id="typing-indicator"></div>
+          <div id="message-input-container">
+            <input type="text" id="message-input" placeholder="Type a message..." onkeypress="handleKeyPress(event)" />
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let socket;
+    let currentUser = null;
+    let authToken = null;
+    let currentRoom = 'general';
+    let typingTimer;
+
+    const API_URL = 'http://localhost:3001';
+
+    function showTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.form-section').forEach(f => f.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(`${tab}-form`).classList.add('active');
+    }
+
+    function showError(message) {
+      const errorMsg = document.getElementById('error-msg');
+      errorMsg.textContent = message;
+      errorMsg.style.display = 'block';
+      setTimeout(() => errorMsg.style.display = 'none', 5000);
+    }
+
+    function showSuccess(message) {
+      const successMsg = document.getElementById('success-msg');
+      successMsg.textContent = message;
+      successMsg.style.display = 'block';
+      setTimeout(() => successMsg.style.display = 'none', 3000);
+    }
+
+    async function register() {
+      const username = document.getElementById('register-username').value.trim();
+      const email = document.getElementById('register-email').value.trim();
+      const password = document.getElementById('register-password').value;
+      const displayName = document.getElementById('register-displayname').value.trim();
+
+      if (!username || !email || !password) {
+        showError('Please fill in all required fields');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, password, displayName })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showSuccess('Registration successful! You can now login.');
+          document.getElementById('register-username').value = '';
+          document.getElementById('register-email').value = '';
+          document.getElementById('register-password').value = '';
+          document.getElementById('register-displayname').value = '';
+          showTab('login');
+          document.getElementById('login-username').value = username;
+        } else {
+          showError(data.message);
+        }
+      } catch (error) {
+        showError('Registration failed. Please try again.');
+        console.error('Registration error:', error);
+      }
+    }
+
+    async function login() {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+
+      if (!username || !password) {
+        showError('Please enter username and password');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          currentUser = data.user;
+          authToken = data.token;
+          showSuccess('Login successful!');
+          
+          setTimeout(() => {
+            showRoomSelection();
+          }, 500);
+        } else {
+          showError(data.message);
+        }
+      } catch (error) {
+        showError('Login failed. Please try again.');
+        console.error('Login error:', error);
+      }
+    }
+
+    function showRoomSelection() {
+      const room = prompt('Enter room name to join:', 'general');
+      if (room) {
+        currentRoom = room;
+        joinChat();
+      }
+    }
+
+    function joinAsGuest() {
+      const username = document.getElementById('guest-username').value.trim();
+      const room = document.getElementById('guest-room').value.trim();
+
+      if (!username || !room) {
+        showError('Please enter username and room name');
+        return;
+      }
+
+      currentUser = {
+        username: username,
+        displayName: username,
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=667eea&color=fff`,
+        userId: 'guest-' + Math.random().toString(36).substr(2, 9)
+      };
+      currentRoom = room;
+      joinChat();
+    }
+
+    function joinChat() {
+      socket = io(API_URL);
+
+      socket.emit('join', {
+        username: currentUser.username,
+        room: currentRoom,
+        userId: currentUser.userId,
+        token: authToken
+      });
+
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('chat-screen').style.display = 'flex';
+      document.getElementById('header-displayname').textContent = currentUser.displayName;
+      document.getElementById('header-avatar').src = currentUser.avatar;
+      document.getElementById('room-name').textContent = `Room: ${currentRoom}`;
+
+      setupSocketListeners();
+    }
+
+    function setupSocketListeners() {
+      socket.on('message-history', (messages) => {
+        messages.forEach(msg => displayMessage(msg));
+      });
+
+      socket.on('receive-message', (data) => {
+        displayMessage(data);
+        
+        if (data.userId !== currentUser.userId) {
+          socket.emit('message-delivered', {
+            messageId: data.id,
+            room: currentRoom
+          });
+
+          setTimeout(() => {
+            socket.emit('message-read', {
+              messageId: data.id,
+              room: currentRoom
+            });
+          }, 500);
+        }
+      });
+
+      socket.on('message-read-update', (data) => {
+        updateMessageStatus(data.messageId, `✓✓ Read`);
+      });
+
+      socket.on('message-status-update', (data) => {
+        updateMessageStatus(data.messageId, `✓ Delivered`);
+      });
+
+      socket.on('user-joined', (data) => {
+        addSystemMessage(data.message);
+      });
+
+      socket.on('user-left', (data) => {
+        addSystemMessage(data.message);
+      });
+
+      socket.on('room-users', (users) => {
+        displayUsers(users);
+      });
+
+      socket.on('user-typing', (data) => {
+        if (data.isTyping) {
+          document.getElementById('typing-indicator').textContent = `${data.displayName || data.username} is typing...`;
+        } else {
+          document.getElementById('typing-indicator').textContent = '';
+        }
+      });
+    }
+
+    function displayMessage(data) {
+      const messagesContainer = document.getElementById('messages-container');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${data.userId === currentUser.userId ? 'own' : ''}`;
+      messageDiv.id = `msg-${data.id}`;
+
+      const time = new Date(data.timestamp).toLocaleTimeString();
+      const avatarUrl = data.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.displayName || data.username)}&background=667eea&color=fff`;
+      
+      messageDiv.innerHTML = `
+        <img class="message-avatar" src="${avatarUrl}" alt="${data.displayName}" />
+        <div class="message-content-wrapper">
+          <div class="message-header">
+            <span class="message-username">${data.displayName || data.username}</span>
+            <span class="message-time">${time}</span>
+          </div>
+          <div class="message-content">${escapeHtml(data.message)}</div>
+          <div class="message-status" id="status-${data.id}"></div>
+        </div>
+      `;
+
+      messagesContainer.appendChild(messageDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function updateMessageStatus(messageId, status) {
+      const statusEl = document.getElementById(`status-${messageId}`);
+      if (statusEl) {
+        statusEl.textContent = status;
+      }
+    }
+
+    function addSystemMessage(message) {
+      const messagesContainer = document.getElementById('messages-container');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'system-message';
+      messageDiv.textContent = message;
+      messagesContainer.appendChild(messageDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function displayUsers(users) {
+      const usersList = document.getElementById('users-list');
+      usersList.innerHTML = '';
+      
+      users.forEach(user => {
+        const userDiv = document.createElement('div');
+        userDiv.className = 'user-item';
+        const statusClass = user.status.online ? 'online' : 'offline';
+        const avatarUrl = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.username)}&background=667eea&color=fff`;
+        
+        userDiv.innerHTML = `
+          <img src="${avatarUrl}" alt="${user.displayName}" />
+          <span class="status-dot ${statusClass}"></span>
+          <span style="font-size: 12px;">${user.displayName || user.username}</span>
+        `;
+        usersList.appendChild(userDiv);
+      });
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('message-input');
+      const message = input.value.trim();
+      
+      if (message && socket) {
+        socket.emit('send-message', { message });
+        input.value = '';
+        socket.emit('typing', false);
+      }
+    }
+
+    function handleKeyPress(event) {
+      if (event.key === 'Enter') {
+        sendMessage();
+        return;
+      }
+      
+      if (socket) {
+        socket.emit('typing', true);
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => {
+          socket.emit('typing', false);
+        }, 1000);
+      }
+    }
+
+    function leaveChat() {
+      if (socket) {
+        socket.emit('leave-room');
+        socket.disconnect();
+      }
+      
+      document.getElementById('auth-screen').style.display = 'block';
+      document.getElementById('chat-screen').style.display = 'none';
+      document.getElementById('messages-container').innerHTML = '';
+      currentUser = null;
+      authToken = null;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
