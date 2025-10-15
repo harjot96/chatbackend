@@ -9,7 +9,7 @@ const pool = new Pool({
   } : false,
   max: config.database.poolSize,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000, // Increased timeout for cloud database
 });
 
 // Test connection
