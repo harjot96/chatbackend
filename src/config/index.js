@@ -26,8 +26,11 @@ module.exports = {
   },
 
   database: {
-    url: process.env.DATABASE_URL || 'postgresql://localhost:5432/chatdb',
+    url: (process.env.DB_USE_INTERNAL_URL === 'true' && process.env.DATABASE_URL_INTERNAL)
+      ? process.env.DATABASE_URL_INTERNAL
+      : process.env.DATABASE_URL || 'postgresql://localhost:5432/chatdb',
     poolSize: parseInt(process.env.DB_POOL_SIZE) || 20,
-    ssl: process.env.DB_SSL === 'true'
+    ssl: process.env.DB_SSL === 'true',
+    caCertPath: process.env.DB_SSL_CA_CERT_PATH || null
   }
 };

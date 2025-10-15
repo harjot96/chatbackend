@@ -1,16 +1,34 @@
+const fs = require('fs');
 const { Pool } = require('pg');
 const config = require('./index');
 
 // Create PostgreSQL connection pool
-const pool = new Pool({
+const poolConfig = {
   connectionString: config.database.url,
-  ssl: config.database.ssl ? {
-    rejectUnauthorized: false
-  } : false,
   max: config.database.poolSize,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000, // Increased timeout for cloud database
-});
+};
+
+if (config.database.ssl) {
+  poolConfig.ssl = {
+    require: true,
+    rejectUnauthorized: false
+  };
+
+  if (config.database.caCertPath) {
+    try {
+      poolConfig.ssl.ca = fs.readFileSync(config.database.caCertPath).toString();
+      // If we have a CA file we can safely enable verification
+      poolConfig.ssl.rejectUnauthorized = true;
+    } catch (error) {
+      console.warn(`⚠️  Unable to load DB SSL CA certificate from ${config.database.caCertPath}:`, error.message);
+      console.warn('    Falling back to non-verifying TLS connection.');
+    }
+  }
+}
+
+const pool = new Pool(poolConfig);
 
 // Test connection
 pool.on('connect', () => {
